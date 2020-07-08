@@ -1,0 +1,56 @@
+@startuml
+
+class Authorization<<JSON>> {
+ - state
+ - access_token
+ - token_type
+ - expires_in
+ - expires_at
+ - scope
+ - authuser
+ - prompt
+ - client_id
+}
+
+class OAuthAbstractHandler {
+    - next
+    + add(next):OAuthAbstractHandler
+    + handle(context)
+}
+
+class OAuthFlowtHandler
+class OAuthSigninHandler
+class OAuthResponseHandler
+class OAuthRedirectHandler
+class OAuthResultHandler
+
+class OAuthError
+class OAuthErrorHandler
+
+class OAuthContext{
+ - clientId
+ - scope
+ - ...
+}
+class OAuthContextFactory {
+    + createLoginContext()
+    + createLoginResponseContext()
+}
+
+OAuthAbstractHandler <-- OAuthFlowtHandler
+OAuthAbstractHandler <-- OAuthSigninHandler
+OAuthAbstractHandler <-- OAuthResponseHandler
+OAuthAbstractHandler <-- OAuthRedirectHandler
+OAuthAbstractHandler <-- OAuthResultHandler
+OAuthAbstractHandler <-- OAuthErrorHandler
+
+OAuthAbstractHandler .up.> OAuthContext:use
+OAuthContext *-up-> Authorization: authorization
+OAuthContext *-right-> OAuthError:error
+OAuthContext *-down-> OAuthAbstractHandler: errorChain
+OAuthContext *-down-> OAuthAbstractHandler: startChain
+OAuthContext *-down-> OAuthAbstractHandler: flowChain
+
+OAuthContextFactory .right.> OAuthContext: create
+
+@enduml

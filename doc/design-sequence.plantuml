@@ -1,0 +1,103 @@
+@startuml
+
+title "JavaScript (WebBroser) Google OAuth Flow - Sequence Diagram for a JavaScript Implementation"
+
+boundary Browser
+control "<<origin/original_url>>\nWebApplication" as User
+
+control ResultHandler
+control "OAuthFlowtHandler" as FlowStartHandler
+control "OAuthSigninHandler" as TokenRequestHandler
+control "<<origin/redirect_url>>\n/redirect_url.html" as redirect_url.html
+control OAuthResponseHandler
+
+entity "OAuthContext" as Context
+database Session.Storage
+database Local.Storage
+
+boundary GoogleOAuth2Server<<google_oauth_url>>
+
+group Initialize OAuth Context
+
+    Browser -> User: onLoad()
+activate User
+
+    User -> Context: create({"scope":scope,"redirect_url":redirect_url} )
+activate Context
+    group Set creditials. This is only once needed per browser!
+        User -> Context : set("client_id", client_id)
+        note right
+        Web storage(local|session) is per origin (per domain and protocol). 
+        All pages, from one origin, can store and access the same data.
+        end note
+        Context -> Local.Storage : set("client_id", client_id)
+    end
+
+end
+
+alt Authorization already finished (authorization != null)
+
+    group return authorization from the session store
+        User -> FlowStartHandler: create( callback )
+activate FlowStartHandler
+        User -> FlowStartHandler: handle(context)
+        FlowStartHandler -> Context: get(authorization)
+        Context -> Session.Storage: get("authorization")
+        FlowStartHandler -> ResultHandler: callback(context)
+activate ResultHandler
+        ResultHandler -> User: callback(authorization)
+deactivate ResultHandler
+
+    end
+
+else Run Authorization Flow
+    
+    group 1. Redirect to Google OAuth 2.0 Server
+        FlowStartHandler -> TokenRequestHandler: handle(context)
+activate TokenRequestHandler
+        TokenRequestHandler -> Context: get("client_id")
+        Context -> Local.Storage: get("client_id")
+        TokenRequestHandler -> Context: get("redirect_url")
+        TokenRequestHandler -> Context: get("scope")
+        TokenRequestHandler -> Browser: submit(google_oaut_url)
+deactivate TokenRequestHandler
+deactivate FlowStartHandler
+deactivate Context        
+deactivate User
+    end 
+
+    group 2. Google login by the user
+        Browser -> GoogleOAuth2Server: /google_oaut_url
+activate GoogleOAuth2Server
+        GoogleOAuth2Server -> Browser: display(login Page)
+        Browser -> GoogleOAuth2Server: login and authorize scope
+        GoogleOAuth2Server -> Browser: redirect(/redirect_url)
+deactivate GoogleOAuth2Server
+    end 
+    
+    group 3. Handle Google Redirect and Login Response
+        Browser -> redirect_url.html: called by redirect
+activate redirect_url.html
+        redirect_url.html --> Context: create({"request", request})
+activate Context 
+        redirect_url.html --> OAuthResponseHandler: create()
+        redirect_url.html --> OAuthResponseHandler: handle(context)
+activate OAuthResponseHandler        
+        OAuthResponseHandler -> Context: get("request")
+        OAuthResponseHandler -> OAuthResponseHandler: extract(request): authorization
+        OAuthResponseHandler -> Context: get("client_id")
+        OAuthResponseHandler -> Context: set("authorization", authorization)
+        Context -> Session.Storage: set("authorization", authorization)
+        OAuthResponseHandler -> Browser: redirect(/original_url)
+deactivate OAuthResponseHandler
+deactivate Context 
+deactivate redirect_url.html
+        note right
+            use window.location.replace(/original_url) to prevent the back button
+        end note
+    end
+    
+end
+
+
+@enduml
